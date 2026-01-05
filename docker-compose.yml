@@ -48,6 +48,8 @@ volumes:
     driver: local
   warfork-logs:
     name: warfork-logs
+  warfork-install:
+    name: warfork-install
 
 services:
   ##############################################################################
@@ -213,15 +215,11 @@ services:
     security_opt:
       - no-new-privileges:true
 
-##############################################################################
-  # Warfork Dedicated Server (fixed SteamCMD order bug)
-  ##############################################################################
   warfork:
-    image: gelmo/warfork-docker:beta
+    image: cm2network/steamcmd:latest  # Reliable, maintained SteamCMD image
     container_name: warfork-server
     hostname: warfork
     network_mode: host
-    user: "5000:5000"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -236,12 +234,20 @@ services:
         max-size: 10m
         max-file: 3
     environment:
-      - WF_PARAMS=+set dedicated 1 +set sv_ip 127.0.0.1 +set sv_port 8889 +set sv_hostname "Warfork Mesh-Only @ demod.ltd (DCF Required)"
-    command: >
-      /bin/sh -c "
-      sed -i 's/+login anonymous \"+force_install_dir /+force_install_dir /g' /usr/local/bin/entrypoint.sh &&
-      /usr/local/bin/entrypoint.sh
-      "
+      - STEAMCMD_ARGS=+force_install_dir /warfork +login anonymous +app_update 1136510 validate +quit
+      - WARFORK_PARAMS=+set dedicated 1 +set sv_ip 127.0.0.1 +set sv_port 8889 +set sv_hostname "Warfork Mesh-Only @ demod.ltd (DCF Required)"
     volumes:
-      - warfork-logs:/home/warfork/.local/share/warfork-2.1/basewf
-      - ./custom-configs:/var/wf:ro
+      - warfork-install:/warfork               # Persistent Warfork install
+      - warfork-logs:/home/steam/.local/share/warfork-2.1/basewf  # Logs & demos (adjust path if needed)
+      - ./custom-configs:/warfork/basewf:ro   # Custom configs/maps (read-only)
+    command: >
+      /bin/bash -c "
+      # Install/update Warfork on first run or when needed
+      if [ ! -f /warfork/Warfork.app/Contents/Resources/warfork.x86_64 ]; then
+        /home/steam/steamcmd/steamcmd.sh $${STEAMCMD_ARGS};
+      fi
+      # Run the server
+      cd /warfork/Warfork.app/Contents/Resources &&
+      ./warfork.x86_64 $${WARFORK_PARAMS}
+      "
+    user: "1000:1000"  # steam user in cm2network image (writable home)
