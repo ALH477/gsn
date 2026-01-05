@@ -8,12 +8,17 @@
 #
 # Usage:
 #   1. Load images: nix build .#docker-gsn-selector && ./result | docker load
-#      (Repeat for meter, bot, and dcf-id)
+#      (Repeat for meter, bot, and dcf-id as needed)
 #   2. Create .env file with required secrets
-#   3. Run: docker compose up -d
+#   3. Prepare game files:
+#      - For freedm: place freedoom2.wad (or doom2.wad) + freedm.wad in ./data/
+#      - For warfork: create ./custom-configs with needed files
+#   4. Run: docker compose up -d
 #
 # Copyright (c) 2025 DeMoD LLC - All Rights Reserved
 ##############################################################################
+
+version: '3.9'
 
 networks:
   dcf-bridge:
@@ -34,6 +39,10 @@ volumes:
     driver: local
   server2-data:
     driver: local
+  warfork-data:
+    name: warfork-data
+  warfork-logs:
+    name: warfork-logs
 
 services:
   ##############################################################################
@@ -208,7 +217,7 @@ services:
       - no-new-privileges:true
 
   ##############################################################################
-  # Additional Standalone Game Servers (host network, mesh-only / non-metered)
+  # Zandronum FreeDM Server (fixed IWAD + PWAD loading)
   ##############################################################################
   freedm:
     image: rcdailey/zandronum-server:official-latest
@@ -229,18 +238,24 @@ services:
         max-size: 10m
         max-file: 3
     command:
+      - -host
       - -port
       - "8888"
       - -iwad
-      - /data/freedm.wad
+      - /data/freedoom2.wad           # Must exist in ./data/ (download from freedoom.github.io)
+      - -file
+      - /data/freedm.wad              # PWAD/mod file
       - +exec
       - /configs/global.cfg
       - +exec
       - /configs/freedm.cfg
     volumes:
-      - ../DCF-DOOM/data:/data:ro
-      - ../DCF-DOOM/configs:/configs:ro
+      - ./data:/data:ro
+      - ./configs:/configs:ro
 
+  ##############################################################################
+  # Warfork Dedicated Server (using named volumes + debug/validation)
+  ##############################################################################
   warfork:
     image: gelmo/warfork-docker:beta
     container_name: warfork-server
@@ -262,6 +277,9 @@ services:
         max-file: 3
     environment:
       - WF_PARAMS=+set dedicated 1 +set sv_ip 127.0.0.1 +set sv_port 8889 +set sv_hostname "Warfork Mesh-Only @ demod.ltd (DCF Required)"
+      - VALIDATE_SERVER_FILES=true
+      - DEBUG=true
     volumes:
-      - ./wf-data:/home/warfork/server
+      - warfork-data:/home/warfork/server
+      - warfork-logs:/home/warfork/.local/share/warfork-2.1/basewf
       - ./custom-configs:/var/wf:ro
