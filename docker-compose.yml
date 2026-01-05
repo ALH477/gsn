@@ -23,7 +23,6 @@ networks:
       config:
         - subnet: 172.30.0.0/16
           gateway: 172.30.0.1
-  # Connect to existing DCF frontend network
   frontend:
     external: true
 
@@ -160,7 +159,7 @@ services:
       - no-new-privileges:true
 
   ##############################################################################
-  # Game Server 1 (spawned dynamically by selector)
+  # Game Server Templates (spawned dynamically by selector or started with --profile game-active)
   ##############################################################################
   gsn-server-1:
     image: ${GAME_IMAGE:-itzg/minecraft-server:java21}
@@ -207,3 +206,62 @@ services:
           memory: 2048M
     security_opt:
       - no-new-privileges:true
+
+  ##############################################################################
+  # Additional Standalone Game Servers (host network, mesh-only / non-metered)
+  ##############################################################################
+  freedm:
+    image: rcdailey/zandronum-server:official-latest
+    container_name: zandronum-freedm
+    hostname: freedm
+    network_mode: host
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2048M
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
+    command:
+      - -port
+      - "8888"
+      - -iwad
+      - /data/freedm.wad
+      - +exec
+      - /configs/global.cfg
+      - +exec
+      - /configs/freedm.cfg
+    volumes:
+      - ../DCF-DOOM/data:/data:ro
+      - ../DCF-DOOM/configs:/configs:ro
+
+  warfork:
+    image: gelmo/warfork-docker:beta
+    container_name: warfork-server
+    hostname: warfork
+    network_mode: host
+    user: "5000:5000"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2048M
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 3
+    environment:
+      - WF_PARAMS=+set dedicated 1 +set sv_ip 127.0.0.1 +set sv_port 8889 +set sv_hostname "Warfork Mesh-Only @ demod.ltd (DCF Required)"
+    volumes:
+      - ./wf-data:/home/warfork/server
+      - ./custom-configs:/var/wf:ro
