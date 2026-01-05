@@ -7,12 +7,18 @@
 #   - All usage tracked and billed through Stripe
 #
 # Usage:
-#   1. Load images: nix build .#docker-gsn-selector && ./result | docker load
-#      (Repeat for meter, bot, and dcf-id as needed)
+#   1. Load images as needed
 #   2. Create .env file with required secrets
 #   3. Prepare game files:
-#      - For freedm: place freedoom2.wad (or doom2.wad) + freedm.wad in ./data/
-#      - For warfork: create ./custom-configs with needed files
+#      - For freedm (Zandronum):
+#        • Download freedoom2.wad from https://freedoom.github.io/download.html
+#        • Rename it to doom2.wad (case-sensitive: all lowercase)
+#        • Place doom2.wad and your freedm.wad in ./data/
+#        • Place config files in ./configs/
+#      - For warfork:
+#        • The image has a known bug with SteamCMD paths when using persistent volumes
+#        • It may install successfully with the named volumes below, or fail — check logs
+#        • If it loops/fails, consider running without the server volume (ephemeral install) or finding an alternative image
 #   4. Run: docker compose up -d
 #
 # Copyright (c) 2025 DeMoD LLC - All Rights Reserved
@@ -39,8 +45,8 @@ volumes:
     driver: local
   server2-data:
     driver: local
-  warfork-data:
-    name: warfork-data
+  warfork-server:
+    name: warfork-server
   warfork-logs:
     name: warfork-logs
 
@@ -145,11 +151,8 @@ services:
       - dcf-bridge
       - frontend
     ports:
-      # HTTP API for internal management
       - "9001:9001/tcp"
-      # UDP game traffic - exposed to players
       - "9000:9000/udp"
-      # Additional UDP ports for multiple game servers
       - "9002:9002/udp"
       - "9003:9003/udp"
       - "9004:9004/udp"
@@ -168,7 +171,7 @@ services:
       - no-new-privileges:true
 
   ##############################################################################
-  # Game Server Templates (spawned dynamically by selector or started with --profile game-active)
+  # Game Server Templates (Minecraft - dynamic or --profile game-active)
   ##############################################################################
   gsn-server-1:
     image: ${GAME_IMAGE:-itzg/minecraft-server:java21}
@@ -217,7 +220,7 @@ services:
       - no-new-privileges:true
 
   ##############################################################################
-  # Zandronum FreeDM Server (fixed IWAD + PWAD loading)
+  # Zandronum FreeDM Server (fixed per official image docs)
   ##############################################################################
   freedm:
     image: rcdailey/zandronum-server:official-latest
@@ -237,24 +240,18 @@ services:
       options:
         max-size: 10m
         max-file: 3
-    command:
-      - -host
-      - -port
-      - "8888"
-      - -iwad
-      - /data/freedoom2.wad           # Must exist in ./data/ (download from freedoom.github.io)
-      - -file
-      - /data/freedm.wad              # PWAD/mod file
-      - +exec
-      - /configs/global.cfg
-      - +exec
-      - /configs/freedm.cfg
+    command: >
+      -port 8888
+      -iwad /data/doom2.wad
+      -file /data/freedm.wad
+      +exec /configs/global.cfg
+      +exec /configs/freedm.cfg
     volumes:
       - ./data:/data:ro
       - ./configs:/configs:ro
 
   ##############################################################################
-  # Warfork Dedicated Server (using named volumes + debug/validation)
+  # Warfork Dedicated Server (per official README - may have install issues)
   ##############################################################################
   warfork:
     image: gelmo/warfork-docker:beta
@@ -277,9 +274,7 @@ services:
         max-file: 3
     environment:
       - WF_PARAMS=+set dedicated 1 +set sv_ip 127.0.0.1 +set sv_port 8889 +set sv_hostname "Warfork Mesh-Only @ demod.ltd (DCF Required)"
-      - VALIDATE_SERVER_FILES=true
-      - DEBUG=true
     volumes:
-      - warfork-data:/home/warfork/server
+      - warfork-server:/home/warfork/server
       - warfork-logs:/home/warfork/.local/share/warfork-2.1/basewf
       - ./custom-configs:/var/wf:ro
