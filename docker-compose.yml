@@ -215,8 +215,8 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  warfork:
-    image: cm2network/steamcmd:latest  # Reliable, maintained SteamCMD image
+    warfork:
+    image: cm2network/steamcmd:latest
     container_name: warfork-server
     hostname: warfork
     network_mode: host
@@ -234,20 +234,31 @@ services:
         max-size: 10m
         max-file: 3
     environment:
-      - STEAMCMD_ARGS=+force_install_dir /warfork +login anonymous +app_update 1136510 validate +quit
+      - STEAMCMD_ARGS=+force_install_dir /warfork +login anonymous +app_update 671610 validate +quit
       - WARFORK_PARAMS=+set dedicated 1 +set sv_ip 127.0.0.1 +set sv_port 8889 +set sv_hostname "Warfork Mesh-Only @ demod.ltd (DCF Required)"
     volumes:
-      - warfork-install:/warfork               # Persistent Warfork install
-      - warfork-logs:/home/steam/.local/share/warfork-2.1/basewf  # Logs & demos (adjust path if needed)
-      - ./custom-configs:/warfork/basewf:ro   # Custom configs/maps (read-only)
+      - warfork-install:/warfork
+      - warfork-logs:/home/steam/.local/share/warfork-2.1/basewf
+      - ./custom-configs:/warfork/basewf:ro
     command: >
       /bin/bash -c "
-      # Install/update Warfork on first run or when needed
-      if [ ! -f /warfork/Warfork.app/Contents/Resources/warfork.x86_64 ]; then
-        /home/steam/steamcmd/steamcmd.sh $${STEAMCMD_ARGS};
+      echo 'Starting Warfork install/check...';
+      if [ ! -f /warfork/Warfork.app/Contents/Resources/wf_server.x86_64 ] && [ ! -f /warfork/Warfork.app/Contents/Resources/warfork.x86_64 ]; then
+        echo 'No binary found - installing with AppID 671610...';
+        /home/steam/steamcmd/steamcmd.sh ${STEAMCMD_ARGS} || echo 'Install failed - check SteamCMD output';
+        echo 'Trying fallback AppID 1136510...';
+        /home/steam/steamcmd/steamcmd.sh +force_install_dir /warfork +login anonymous +app_update 1136510 validate +quit || echo 'Fallback also failed';
+      else
+        echo 'Binary already exists - skipping install';
+      fi;
+      echo 'Launching server...';
+      cd /warfork/Warfork.app/Contents/Resources || { echo 'Path not found - check install'; exit 1; };
+      if [ -f wf_server.x86_64 ]; then
+        ./wf_server.x86_64 ${WARFORK_PARAMS};
+      elif [ -f warfork.x86_64 ]; then
+        ./warfork.x86_64 ${WARFORK_PARAMS};
+      else
+        echo 'Server binary not found after install - check /warfork contents';
+        exit 1;
       fi
-      # Run the server
-      cd /warfork/Warfork.app/Contents/Resources &&
-      ./warfork.x86_64 $${WARFORK_PARAMS}
       "
-    user: "1000:1000"  # steam user in cm2network image (writable home)
