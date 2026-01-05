@@ -38,46 +38,6 @@ volumes:
 
 services:
   ##############################################################################
-  # DCF-ID - Identity & Billing Service
-  ##############################################################################
-  dcf-id:
-    image: alh477/dcf-id:latest
-    container_name: dcf-id
-    restart: unless-stopped
-    environment:
-      - IDENTITY_PORT=4000
-      - DATABASE_URL=sqlite:/data/identity.db?mode=rwc
-      - BASE_URL=${DCF_PUBLIC_URL:-https://dcf.demod.ltd}
-      - RUST_LOG=${LOG_LEVEL:-info}
-      # Secrets (Set these in .env)
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
-      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
-      - DISCORD_REDIRECT_URL=${DISCORD_REDIRECT_URL:-https://dcf.demod.ltd/auth/callback}
-      - DCF_ID_INTERNAL_KEY=${DCF_ID_INTERNAL_KEY}
-    volumes:
-      - demod-data:/data
-    networks:
-      - dcf-bridge
-      - frontend
-    ports:
-      - "4000:4000"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:4000/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    security_opt:
-      - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          cpus: "0.50"
-          memory: 256M
-
-  ##############################################################################
   # Discord Bot - Ultra-lightweight command interface
   ##############################################################################
   gsn-discord-bot:
