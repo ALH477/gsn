@@ -234,7 +234,7 @@ services:
         max-size: 10m
         max-file: 3
     environment:
-      - STEAMCMD_ARGS=+force_install_dir /warfork +login anonymous +app_update 1136510 validate +quit
+      - STEAMCMD_ARGS=+force_install_dir /warfork +login YOUR_STEAM_USERNAME YOUR_STEAM_PASSWORD +app_update 1136510 validate +quit
       - WARFORK_PARAMS=+set dedicated 1 +set sv_ip 127.0.0.1 +set sv_port 8889 +set sv_hostname "Warfork Mesh-Only @ demod.ltd (DCF Required)"
     volumes:
       - warfork-install:/warfork
@@ -244,20 +244,18 @@ services:
       /bin/bash -c "
       echo 'Warfork startup - checking for existing install...';
       if [ ! -f /warfork/wf_server.x86_64 ] && [ ! -f /warfork/Warfork.app/Contents/Resources/wf_server.x86_64 ]; then
-        echo 'No server binary found - performing fresh install with AppID 1136510 (dedicated server)...';
+        echo 'No server binary found - performing fresh install with AppID 1136510...';
         /home/steam/steamcmd/steamcmd.sh ${STEAMCMD_ARGS} || {
-          echo 'SteamCMD install FAILED! Full output above. Possible causes:';
-          echo ' - AppID access restricted (try logged-in Steam account)';
-          echo ' - Network/Steam server issues';
-          echo ' - Wrong AppID (fallback already tried)';
+          echo 'SteamCMD install FAILED! Full output above.';
+          echo 'If \"Missing configuration\" → try different AppID or check account ownership.';
           exit 1;
         };
-        echo 'Install attempted. Listing files for debug:';
+        echo 'Install complete. Listing files for debug:';
         ls -laR /warfork || echo 'No files in /warfork';
       else
         echo 'Server binary detected - skipping install';
       fi;
-      echo 'Attempting to launch server...';
+      echo 'Launching server...';
       if [ -f /warfork/wf_server.x86_64 ]; then
         cd /warfork && ./wf_server.x86_64 ${WARFORK_PARAMS};
       elif [ -f /warfork/Warfork.app/Contents/Resources/wf_server.x86_64 ]; then
@@ -265,7 +263,7 @@ services:
       else
         echo 'ERROR: No executable found after install!';
         echo 'Contents of /warfork:';
-        ls -la /warfork;
+        ls -laR /warfork;
         exit 1;
       fi
       "
